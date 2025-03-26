@@ -60,8 +60,6 @@ class TravelChatbot:
         folium_static(m)
 
     def extract_json_from_response(self, content):
-        """Helper method to extract JSON from a text response, handling various formats"""
-        # Look for content within JSON code blocks
         if "```json" in content:
             json_start = content.find("```json") + 7
             json_end = content.find("```", json_start)
@@ -69,7 +67,6 @@ class TravelChatbot:
                 json_str = content[json_start:json_end].strip()
                 return json_str
                 
-        # Look for content within plain code blocks
         elif "```" in content:
             json_start = content.find("```") + 3
             json_end = content.find("```", json_start)
@@ -77,21 +74,17 @@ class TravelChatbot:
                 json_str = content[json_start:json_end].strip()
                 return json_str
                 
-        # Look for content that appears to be JSON (surrounded by curly braces)
         json_pattern = r'({[\s\S]*})'
         matches = re.search(json_pattern, content, re.DOTALL)
         if matches:
             return matches.group(1).strip()
             
-        # If no JSON-like content found, return the original content
         return content
 
     def generate_itinerary(self):
-        # Make sure travel_info is initialized before accessing it
         if 'travel_info' not in st.session_state:
             st.session_state.travel_info = {}
         
-        # Create a copy of chat_state to avoid modifying the original
         info = {
             'destination': st.session_state.chat_state['city'],
             'start_date': st.session_state.chat_state['start_date'],
@@ -103,10 +96,8 @@ class TravelChatbot:
             'interests': st.session_state.chat_state['interests']
         }
         
-        # Update travel_info
         st.session_state.travel_info.update(info)
         
-        # Get weather forecast
         try:
             city = info['destination']
             weather = get_weather_forecast(city)
@@ -115,7 +106,6 @@ class TravelChatbot:
             st.warning("Could not fetch weather data")
         
         try:
-            # Prepare messages for the ChatGroq model with EXPLICIT formatting instructions
             system_message = f"""You are a smart AI travel assistant. 
             Generate a detailed itinerary for {info['destination']} from {info['start_date']} to {info['end_date']}, based on these interests: {', '.join(info['interests'])}.
             The trip is planned for {info['duration']} days.
@@ -153,28 +143,21 @@ class TravelChatbot:
                 {"role": "user", "content": "Generate my travel itinerary in JSON format only."}
             ]
             
-            # Get response from Groq
             response = self.llm.invoke(messages)
             
-            # If we received no content, raise an error
             if not response.content:
                 st.error("Received empty response from the API.")
                 return None
             
-            # Extract JSON from the response
             json_str = self.extract_json_from_response(response.content)
             
             try:
-                # Parse the JSON string
                 itinerary = json.loads(json_str)
                 
-                # Validate the itinerary structure
                 if "daily_plans" not in itinerary:
                     if "tripDetails" in itinerary or "days" in itinerary or "itinerary" in itinerary:
-                        # Try to convert to expected format
                         converted_itinerary = {"daily_plans": []}
                         
-                        # Handle different possible response formats
                         if "days" in itinerary:
                             for day in itinerary["days"]:
                                 day_num = day.get("day", 1)
@@ -186,19 +169,17 @@ class TravelChatbot:
                                 converted_day = {"day": i, "activities": day.get("activities", [])}
                                 converted_itinerary["daily_plans"].append(converted_day)
                         else:
-                            # As a fallback, use the original structure
                             st.warning("Received unexpected JSON structure. Attempting to use as-is.")
                             converted_itinerary = {"daily_plans": [itinerary]}
                         
                         itinerary = converted_itinerary
-                # Store the parsed itinerary
                 st.session_state.travel_info['itinerary'] = itinerary
-                st.session_state.travel_info['famous_places'] = self.fetch_famous_places(info['destination'])  # Fetch famous places
+                st.session_state.travel_info['famous_places'] = self.fetch_famous_places(info['destination'])
                 return itinerary
                 
             except json.JSONDecodeError as e:
                 st.error(f"Failed to parse JSON response: {str(e)}")
-                st.code(json_str)  # Display the problematic JSON for debugging
+                st.code(json_str)
                 return None
             
         except Exception as e:
@@ -206,7 +187,6 @@ class TravelChatbot:
             return None
             
     def edit_itinerary(self, query):
-        """Handle user queries to modify the itinerary"""
         if 'itinerary' not in st.session_state.travel_info:
             return "I don't have an itinerary to edit yet. Please generate one first."
         
@@ -244,27 +224,21 @@ class TravelChatbot:
                 {"role": "user", "content": f"Update the itinerary with these changes: {query}"}
             ]
             
-            # Get response from the LLM
             response = self.llm.invoke(messages)
             
-            # Extract JSON from the response
             json_str = self.extract_json_from_response(response.content)
             
             try:
-                # Parse the JSON string
                 updated_itinerary = json.loads(json_str)
                 
-                # Validate that the response has the expected structure
                 if "daily_plans" not in updated_itinerary:
                     return f"I received an invalid response format. Please try again with more specific instructions. Please ensure your request is clear and specific."
                 
-                # Store the updated itinerary
                 st.session_state.travel_info['itinerary'] = updated_itinerary
                 
                 return f"I've updated your itinerary based on your request: '{query}'. You can see the changes in the itinerary section."
                 
             except json.JSONDecodeError:
-                # If JSON parsing fails, return the original response
                 return f"I couldn't process the itinerary update. Here's what I understand about your request: {response.content}"
             
         except Exception as e:
@@ -275,8 +249,7 @@ class TravelChatbot:
             st.error("FOURSQUARE_API_KEY not found in Streamlit secrets")
             raise ValueError("API keys not configured")
 
-        """Fetch famous places in the specified city using Foursquare API.""" 
-        api_key = st.secrets["FOURSQUARE_API_KEY"]  # Accessing Foursquare API Key
+        api_key = st.secrets["FOURSQUARE_API_KEY"]
         url = f"https://api.foursquare.com/v2/venues/explore?near={city}&client_id={api_key}&v=20230101"
         
         response = requests.get(url)
@@ -286,7 +259,7 @@ class TravelChatbot:
             for place in places:
                 name = place.get("name")
                 address = place.get("formatted_address")
-                image_url = place.get("imageUrl")  # Assuming Foursquare API returns an image URL directly
+                image_url = place.get("imageUrl")
                 famous_places.append({
                     "name": name,
                     "address": address,
@@ -298,11 +271,6 @@ class TravelChatbot:
             return []
 
 def suggest_locations(self, city, query=None):
-    """
-    Suggest famous locations based on the user's destination city and additional
-    locations based on user query.
-    """
-    # First part: fetch famous places
     famous_places = self.fetch_famous_places(city)
     if famous_places and not query:
         places_info = "\n".join([f"{place['name']} - {place['address']} ![Image]({place['image_url']})" 
@@ -311,7 +279,6 @@ def suggest_locations(self, city, query=None):
     elif not query:
         return "No famous places found."
     
-    # Second part: suggest additional locations based on user query
     try:
         info = st.session_state.travel_info
         
@@ -339,30 +306,23 @@ def suggest_locations(self, city, query=None):
             {"role": "user", "content": query}
         ]
         
-        # Get response from the LLM
         response = self.llm.invoke(messages)
         
-        # Extract JSON from the response
         json_str = self.extract_json_from_response(response.content)
         
         try:
-            # Parse the JSON string
             suggestions = json.loads(json_str)
             
-            # Validate that the response has the expected structure
             if "suggested_locations" not in suggestions:
                 return f"I received invalid suggestions. Please try again with more specific instructions."
             
-            # Store the suggestions
             if 'suggested_locations' not in st.session_state.travel_info:
                 st.session_state.travel_info['suggested_locations'] = []
             
-            # Add new suggestions
             st.session_state.travel_info['suggested_locations'].extend(
                 suggestions.get('suggested_locations', [])
             )
             
-            # Prepare human-readable response
             location_list = []
             for loc in suggestions.get('suggested_locations', []):
                 location_list.append(f"• **{loc['name']}**: {loc['description']}")
@@ -370,7 +330,6 @@ def suggest_locations(self, city, query=None):
             return f"I've added these new locations to your map:\n\n" + "\n\n".join(location_list)
             
         except json.JSONDecodeError:
-            # If JSON parsing fails, return the original response
             return f"I couldn't process the location suggestions. Here's what I understand about your request: {response.content}"
             
     except Exception as e:
@@ -380,7 +339,6 @@ def suggest_locations(self, city, query=None):
 def show_chatbot():
     st.title("🌍 ChaloChalein")
     
-    # Initialize session state
     if 'travel_info' not in st.session_state:
         st.session_state.travel_info = {}
     if 'messages' not in st.session_state:
@@ -401,44 +359,37 @@ def show_chatbot():
             "suggested_locations": []
         }
 
-    # Create two columns for the main layout
     main_col1, main_col2 = st.columns([2, 1])
 
     with main_col1:
         st.write("Plan your trip step by step!")
 
-        # Display chat messages
         for message in st.session_state.messages:
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
 
-        # Input form
         chat_state = st.session_state.chat_state
         if chat_state["step"] == "city":
             city_input = st.text_input("🌍 Enter your destination city:", value=chat_state["city"])
             if st.button("Enter") and city_input:
-                # Fetch weather data for the entered city
                 weather_data = get_weather_forecast(city_input)
                 if weather_data:
                     if "error" in weather_data:
                         st.warning(weather_data["error"])
                     else:
                         st.write(f"Weather in {weather_data['location']}: {weather_data['temperature']}°C")
-                        st.session_state.weather_data_displayed = True  # Track that weather data has been displayed
+                        st.session_state.weather_data_displayed = True
                 else:
                     st.warning("Could not retrieve weather data.")
 
-                # Hide the Enter button after it has been pressed
-                st.session_state.enter_button_pressed = True  # Track that the Enter button has been pressed
+                st.session_state.enter_button_pressed = True
 
-            # Show the Next button if weather data has been displayed
             if st.session_state.get("weather_data_displayed", False) and st.button("Next"):
-                chat_state.update({"city": city_input, "step": "dates"})  # Update city and move to the next step
+                chat_state.update({"city": city_input, "step": "dates"})
 
         elif chat_state["step"] == "dates":
             if st.button("🔙 Back", key="back_dates"):
-                chat_state["step"] = "city"  # Go back to the previous step
-                # Ensure city input remains unchanged
+                chat_state["step"] = "city"
                 city_input = chat_state["city"]
             col1, col2 = st.columns(2)
             with col1:
@@ -462,8 +413,7 @@ def show_chatbot():
 
         elif chat_state["step"] == "traveling_via":
             if st.button("🔙 Back", key="back_traveling_via"):
-                chat_state["step"] = "dates"  # Go back to the previous step
-                # Ensure travel vehicle input remains unchanged
+                chat_state["step"] = "dates"
                 traveling_via_input = chat_state["traveling_via"]
             traveling_via_input = st.radio("Do you already have planned your travel vehicle?", ["Yes", "No"])
             if traveling_via_input == "Yes":
@@ -486,8 +436,7 @@ def show_chatbot():
 
         elif chat_state["step"] == "times":
             if st.button("🔙 Back", key="back_times"):
-                chat_state["step"] = "traveling_via"  # Go back to the previous step
-                # Ensure arrival and departure times remain unchanged
+                chat_state["step"] = "traveling_via"
                 arrival_time = chat_state["arrival_time"]
                 departure_time = chat_state["departure_time"]
             st.write("### Travel Times")
@@ -496,7 +445,7 @@ def show_chatbot():
                 arrival_time = st.time_input(
                     "🛬 What time do you arrive?", 
                     value=chat_state["arrival_time"],
-                    step=300  # 5-minute intervals
+                    step=300
                 )
                 st.info(f"Arrival: {arrival_time.strftime('%I:%M %p')}")
 
@@ -504,7 +453,7 @@ def show_chatbot():
                 departure_time = st.time_input(
                     "🛫 What time do you depart?", 
                     value=chat_state["departure_time"],
-                    step=300  # 5-minute intervals
+                    step=300
                 )
                 st.info(f"Departure: {departure_time.strftime('%I:%M %p')}")
             if st.button("Confirm Times"):
@@ -516,8 +465,7 @@ def show_chatbot():
 
         elif chat_state["step"] == "traveling_with":
             if st.button("🔙 Back", key="back_traveling_with"):
-                chat_state["step"] = "times"  # Go back to the previous step
-                # Ensure traveling with input remains unchanged
+                chat_state["step"] = "times"
                 traveling_with = chat_state["traveling_with"]
             traveling_with = st.radio("Are you traveling with pets or children?", ["Yes", "No"])
             if st.button("Next"):
@@ -525,8 +473,7 @@ def show_chatbot():
 
         elif chat_state["step"] == "interests":
             if st.button("🔙 Back", key="back_interests"):
-                chat_state["step"] = "traveling_with"  # Go back to the previous step
-                # Ensure interests input remains unchanged
+                chat_state["step"] = "traveling_with"
                 interests_input = ", ".join(chat_state["interests"])
             interests_input = st.text_area("🎯 Enter your interests (comma-separated)",
                                             value=", ".join(chat_state["interests"]))
@@ -537,7 +484,7 @@ def show_chatbot():
 
         elif chat_state["step"] == "confirm":
             if st.button("🔙 Back", key="back_interests"):
-                chat_state["step"] = "interests"  # Go back to the interests page
+                chat_state["step"] = "interests"
             st.write("### Trip Summary")
             st.write(f"🌍 Destination: {chat_state['city']}")
             st.write(f"📅 Dates: {chat_state['start_date'].strftime('%B %d, %Y')} - {chat_state['end_date'].strftime('%B %d, %Y')}")
@@ -554,7 +501,7 @@ def show_chatbot():
 
         elif chat_state["step"] == "generate":
             if st.button("🔙 Back"):
-                chat_state["step"] = "confirm"  # Go back to the previous step
+                chat_state["step"] = "confirm"
                 
             try:
                 with st.spinner("Generating your personalized itinerary..."):
@@ -563,7 +510,7 @@ def show_chatbot():
                     
                 if itinerary:
                     if 'suggested_locations' not in st.session_state.travel_info:
-                        st.session_state.travel_info['suggested_locations'] = []  # Initialize suggested locations if not present
+                        st.session_state.travel_info['suggested_locations'] = []
 
                     st.session_state.messages.append({
                         "role": "assistant",
@@ -577,14 +524,11 @@ def show_chatbot():
                 st.error(f"An error occurred: {str(e)}")
 
         elif chat_state["step"] == "itinerary":
-            # Display generated itinerary and add a save button
             if st.button("💾 Save Trip"):
                 st.session_state.saved_trip = st.session_state.travel_info['itinerary']
                 st.success("Trip saved successfully!")
             if 'itinerary' in st.session_state.travel_info and st.session_state.travel_info['itinerary']:
                 itinerary = st.session_state.travel_info['itinerary']
-
-        # Add edit and suggestion buttons
 
             col1, col2 = st.columns(2)
             with col1:
@@ -604,28 +548,23 @@ def show_chatbot():
                         })
                         st.rerun()
                     
-                # Show the daily plans
             for day in itinerary['daily_plans']:
                     with st.expander(f"Day {day['day']}", expanded=True):
                         for activity in day['activities']:
                             st.write(f"**{activity['time']}**: {activity['activity']}")
                             st.write(f"📍 Location: {activity['location']}")
                             
-    # Map display in second column
     with main_col2:
         if 'travel_info' in st.session_state and 'destination' in st.session_state.travel_info:
             st.header("📍 Recommended Locations")
             chatbot = TravelChatbot()
             
-            # Combine locations from itinerary and suggested locations
             locations = []
             
-            # Add itinerary locations
             if 'itinerary' in st.session_state.travel_info:
                 for day in st.session_state.travel_info['itinerary']['daily_plans']:
                     locations.extend(day['activities'])
             
-            # Add suggested locations
             if 'suggested_locations' in st.session_state.travel_info:
                 for loc in st.session_state.travel_info['suggested_locations']:
                     locations.append({
@@ -634,38 +573,19 @@ def show_chatbot():
                     })
             
             chatbot.display_map(st.session_state.travel_info['destination'], locations)
+            chat_state["step"] = "itinerary"
             
-    if 'itinerary' in st.session_state.travel_info:
-        # Display the famous places in the city
-        chatbot = TravelChatbot()
-        famous_places = chatbot.fetch_famous_places(chat_state["city"])
-        if famous_places:
-            st.write("Here are some famous places in your destination city:")
-            for place in famous_places:
-                st.write(f"**{place['name']}** - {place['address']}")
-                if place['image_url']:
-                    st.image(place['image_url'], caption=place['name'], use_column_width=True)
-        else:
-            st.warning("No famous places found.")
-        chat_state["step"] = "itinerary"
-
-    # IMPORTANT: Move chat_input outside of any columns, forms, expanders, etc.
-    # This needs to be at the root level of the app
     if chat_state["step"] == "itinerary":
-        # Chat input for follow-up questions - at the ROOT level of the app
         prompt = st.chat_input("Ask me anything about your itinerary or type 'edit' to modify it")
         if prompt:
-            st.session_state.messages.append({"role": "user", "content": prompt})  # Ensure user input is captured
+            st.session_state.messages.append({"role": "user", "content": prompt})
 
             chatbot = TravelChatbot()
             
-            # Handle specific edit requests
             if "edit" in prompt.lower() or "change" in prompt.lower() or "modify" in prompt.lower():
                 response = chatbot.edit_itinerary(prompt)
-            # Handle suggestion requests
             elif "suggest" in prompt.lower() or "more location" in prompt.lower() or "additional place" in prompt.lower():
                 response = chatbot.suggest_locations(prompt)
-            # General questions
             else:
                 response = chatbot.llm.invoke(prompt).content
             
@@ -677,5 +597,4 @@ def show_chatbot():
             st.rerun()
 
 
-# Make the function available for import
 show_chatbot = show_chatbot
