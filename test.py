@@ -9,13 +9,13 @@ def test_langchain_groq():
             model_name="llama-3.3-70b-versatile"
         )
         
-        # Create a list of messages directly
+        
         messages = [
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": "Say hello!"}
         ]
         
-        response = llm.invoke(messages)  # Pass the list of messages directly
+        response = llm.invoke(messages) 
         
         st.success("✅ Langchain-Groq connection successful!")
         st.write("Response:", response.content)
