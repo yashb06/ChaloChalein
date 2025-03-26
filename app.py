@@ -1,8 +1,10 @@
 import streamlit as st
 import sys
+sys.path.append("c:/Users/DARSHAN/OneDrive - somaiya.edu/Desktop/ChaloChalein")
+
 from components.authentication import show_auth_page
 from components.homepage import show_homepage
-from components.chatbot import show_chatbot  # Importing the chatbot function
+from components.chatbot import show_chatbot
 from components.map_view import show_map
 from firebase_admin import auth
 import firebase_admin
@@ -10,14 +12,12 @@ from firebase_admin import credentials
 import requests
 from components.trips import show_trips
 
-# Set up the Streamlit page configuration
 st.set_page_config(
     page_title="AI Travel Planner",
     page_icon="✈️",
     layout="wide"
 )
 
-# Custom CSS for styling
 st.markdown("""
     <style>
     .sidebar .sidebar-content {
@@ -69,8 +69,6 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
-
-# Initialize Firebase only if it hasn't been initialized
 if 'firebase_initialized' not in st.session_state:
     try:
         cred = credentials.Certificate("streamlit/chalochalein-1ba3c-firebase-adminsdk-fbsvc-0c3d443ca8.json")
@@ -78,23 +76,18 @@ if 'firebase_initialized' not in st.session_state:
         st.session_state.firebase_initialized = True
     except ValueError as e:
         st.session_state.firebase_initialized = True
-        pass  # Firebase already initialized
+        pass
 
 def main():
-    # Initialize session state
     if 'user' not in st.session_state:
-        st.session_state.user = None  # Initialize user key
+        st.session_state.user = None
     if 'page' not in st.session_state:
         st.session_state.page = 'home'
-
-    # Sidebar navigation with enhanced UI
     with st.sidebar:
-        # Logo and App Name
         st.markdown('<div class="logo-text">✈️ AI Travel Planner</div>', unsafe_allow_html=True)
         st.markdown('<div class="separator"></div>', unsafe_allow_html=True)
 
         if st.session_state.user:
-            # User Info Section
             st.markdown(
                 f'''
                 <div class="user-info">
@@ -108,7 +101,6 @@ def main():
                 unsafe_allow_html=True
             )
 
-            # Navigation Buttons
             col1, col2 = st.columns(2)
             with col1:
                 if st.button("🏠 Home", key="home_btn", help="Go to homepage", use_container_width=True):
@@ -130,14 +122,12 @@ def main():
                 st.session_state.page = 'home'
                 st.rerun()
 
-    
-    # Main content
     if st.session_state.page == 'home':
         show_homepage() 
     elif st.session_state.page == 'auth':
         show_auth_page()
     elif st.session_state.page == 'chatbot' and st.session_state.user:
-        show_chatbot()  # Call the chatbot function to display the chatbot interface
+        show_chatbot()
     elif st.session_state.page == 'trips' and st.session_state.user:
         show_trips()
     else:
