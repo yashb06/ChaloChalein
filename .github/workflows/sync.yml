@@ -1,0 +1,20 @@
+name: Auto Sync Fork
+
+on:
+  schedule:
+    - cron: '0 0 * * 0' # Runs every Sunday at midnight
+  workflow_dispatch: # Allow manual trigger from the Actions tab
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Sync Fork
+        uses: tgymnich/fork-sync@v1
+        with:
+          owner: DevLM7
+          repo: ChaloChalein
+          token: ${{ secrets.GITHUB_TOKEN }}
